@@ -1,0 +1,9 @@
+{
+    "welcome": "Welcome to the React App",
+    "description": "This is a simple React app.",
+    "home": "Home",
+    "about": "About",
+    "contact": "Contact",
+    "product": "Product",
+    "form": "Form"
+}

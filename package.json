@@ -1,0 +1,35 @@
+{
+    "name": "bun-react-template",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "bun --hot example/index.ts",
+        "build": "bun build ./example/index.html --outdir=dist --sourcemap --target=browser --minify --define:process.env.NODE_ENV='\"production\"' --env='BUN_PUBLIC_*'",
+        "start": "NODE_ENV=production bun example/index.ts",
+        "tailwind:build": "tailwindcss -i ./engine/styles.css -o ./engine/output.css",
+        "tailwind:watch": "tailwindcss -i ./engine/styles.css -o ./engine/output.css --watch",
+        "context": "bun run tailwind:build && bun --hot engine/index.ts",
+        "context:dev": "bun run tailwind:watch & bun --hot engine/index.ts",
+        "context:build": "bun run engine/build.ts"
+    },
+    "dependencies": {
+        "@tanstack/react-query": "^5.90.11",
+        "lucide-react": "^0.309.0",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "react-hook-form": "^7.66.1",
+        "react-intl": "^7.1.14"
+    },
+    "devDependencies": {
+        "@types/bun": "latest",
+        "@types/node": "^24.10.1",
+        "@types/react": "^18.2.0",
+        "@types/react-dom": "^18.2.0",
+        "autoprefixer": "^10.4.17",
+        "glob": "^13.0.0",
+        "postcss": "^8.4.33",
+        "tailwindcss": "^3.4.1",
+        "typescript": "^5.9.3"
+    }
+}
