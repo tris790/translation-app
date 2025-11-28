@@ -7,8 +7,6 @@ import {
     ChevronDown,
     ChevronUp,
     Eye,
-    ToggleRight,
-    ToggleLeft,
 } from "lucide-react";
 import {
     useState,
@@ -18,21 +16,20 @@ import {
 } from "react";
 import { useAppContext } from "./ContextProvider";
 import PropInput from "./PropInput";
-import { componentRegistry } from "../ComponentRegistry";
+import { componentRegistry } from "../ComponentBundle";
 import { generatePropsData } from "../PropsDataGenerator";
-import { IntlProvider } from "react-intl";
+import TranslationHighlighter from "./TranslationHighlighter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import enTranslations from "../../example/translations/en-translation.json";
+import frTranslations from "../../example/translations/fr-translation.json";
+import { getComponentStyles } from "../ComponentStyleBundle";
+import { DesignSystemWrapper } from "../DesignSystemBundle.tsx";
+import { initDesignSystemPreview } from "../DesignSystemInit";
 
-// Mock translations for preview
-const mockTranslations = {
-    welcome: "Welcome",
-    description: "This is a description",
-    home: "Home",
-    contact: "Contact",
-    product: "Product",
-    form: "Form",
-    submit: "Submit",
-    cancel: "Cancel",
+// Available translations
+const translations: Record<string, Record<string, string>> = {
+    en: enTranslations,
+    fr: frTranslations,
 };
 
 // Create a query client for preview
@@ -111,6 +108,98 @@ class ErrorBoundary extends ReactComponent<
     }
 }
 
+/**
+ * Custom hook to dynamically inject component-specific CSS
+ * Loads CSS files for the current component and injects them into @layer components
+ */
+function useComponentStyles(componentId: string | null) {
+    useEffect(() => {
+        if (!componentId) return;
+
+        const styleId = `component-styles-${componentId}`;
+
+        // Remove previous component's styles
+        const existingStyle = document.getElementById(styleId);
+        if (existingStyle) {
+            existingStyle.remove();
+        }
+
+        // Get CSS file paths for this component
+        const cssPaths = getComponentStyles(componentId);
+
+        if (cssPaths.length === 0) {
+            return; // No CSS files for this component
+        }
+
+        // Fetch and inject CSS files
+        Promise.all(
+            cssPaths.map(async (cssPath) => {
+                try {
+                    const response = await fetch(cssPath);
+                    if (!response.ok) {
+                        console.warn(`Failed to load CSS: ${cssPath}`);
+                        return '';
+                    }
+                    return await response.text();
+                } catch (error) {
+                    console.warn(`Error loading CSS ${cssPath}:`, error);
+                    return '';
+                }
+            })
+        ).then((cssContents) => {
+            const combinedCSS = cssContents.filter(css => css.trim()).join('\n\n');
+
+            if (!combinedCSS) return;
+
+            // Create style element and inject into @layer components
+            const styleElement = document.createElement('style');
+            styleElement.id = styleId;
+            styleElement.textContent = `@layer components {\n${combinedCSS}\n}`;
+            document.head.appendChild(styleElement);
+        });
+
+        // Cleanup on unmount
+        return () => {
+            const styleElement = document.getElementById(styleId);
+            if (styleElement) {
+                styleElement.remove();
+            }
+        };
+    }, [componentId]);
+}
+
+/**
+ * Custom hook to load design system CSS
+ * Loads the global design system stylesheet once
+ */
+function useDesignSystemCSS() {
+    useEffect(() => {
+        const styleId = 'design-system-css';
+        const existing = document.getElementById(styleId);
+        if (existing) return; // Already loaded
+
+        const link = document.createElement('link');
+        link.id = styleId;
+        link.rel = 'stylesheet';
+        link.href = './design-system.css';
+        document.head.appendChild(link);
+
+        return () => {
+            document.getElementById(styleId)?.remove();
+        };
+    }, []);
+}
+
+/**
+ * Custom hook to initialize design system
+ * Runs initialization function once on mount
+ */
+function useDesignSystemInit() {
+    useEffect(() => {
+        initDesignSystemPreview();
+    }, []);
+}
+
 interface PreviewViewProps {
     onBack: () => void;
 }
@@ -121,6 +210,8 @@ export default function PreviewView({ onBack }: PreviewViewProps) {
         selectedComponentId,
         setSelectedComponentId,
         getComponent,
+        locale,
+        setLocale,
     } = useAppContext();
     const [expandedSections, setExpandedSections] = useState({
         props: true,
@@ -132,10 +223,20 @@ export default function PreviewView({ onBack }: PreviewViewProps) {
     const [propValues, setPropValues] = useState<Record<string, any> | null>(
         null,
     );
+    const [hoveredTranslationKey, setHoveredTranslationKey] = useState<
+        string | null
+    >(null);
 
     const component = selectedComponentId
         ? getComponent(selectedComponentId)
         : null;
+
+    // Dynamically inject component-specific CSS
+    useComponentStyles(selectedComponentId);
+
+    // Load design system CSS and initialize
+    useDesignSystemCSS();
+    useDesignSystemInit();
 
     // Initialize prop values when component changes
     useEffect(() => {
@@ -249,7 +350,7 @@ export default function PreviewView({ onBack }: PreviewViewProps) {
                                 )}
                             </button>
                             {expandedSections.props && (
-                                <div>
+                                <div className="space-y-3">
                                     {component.props.length === 0 ? (
                                         <p className="text-slate-500 text-sm">
                                             No props
@@ -309,7 +410,7 @@ export default function PreviewView({ onBack }: PreviewViewProps) {
                                             return (
                                                 <div
                                                     key={idx}
-                                                    className="bg-slate-800/50 border border-slate-700 rounded-lg p-3"
+                                                    className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 space-y-2"
                                                 >
                                                     <div className="flex items-baseline gap-2">
                                                         <span className="text-amber-400 font-mono text-sm font-bold">
@@ -321,34 +422,23 @@ export default function PreviewView({ onBack }: PreviewViewProps) {
                                                         <span className="text-slate-400 font-mono text-xs">
                                                             {hook.type}
                                                         </span>
-                                                        {hook.name ===
-                                                            "useIntl" && (
-                                                            <>
-                                                                <span className="text-sm font-medium text-slate-300">
-                                                                    English
-                                                                </span>
-
-                                                                <button
-                                                                    onClick={() => {}} // Todo: Change language that is in the IntlProvider
-                                                                    className={`transition-colors duration-200 ${true ? "text-indigo-400" : "text-slate-600"}`}
-                                                                >
-                                                                    {true ? (
-                                                                        <ToggleRight
-                                                                            size={
-                                                                                28
-                                                                            }
-                                                                        />
-                                                                    ) : (
-                                                                        <ToggleLeft
-                                                                            size={
-                                                                                28
-                                                                            }
-                                                                        />
-                                                                    )}
-                                                                </button>
-                                                            </>
-                                                        )}
                                                     </div>
+                                                    {hook.name === "useIntl" && (
+                                                        <div className="flex items-center gap-2 pt-1 border-t border-slate-700/50">
+                                                            <Globe size={12} className="text-slate-500" />
+                                                            <span className="text-slate-500 text-xs">
+                                                                Language:
+                                                            </span>
+                                                            <select
+                                                                value={locale}
+                                                                onChange={(e) => setLocale(e.target.value)}
+                                                                className="ml-auto bg-slate-900/80 border border-slate-600/50 text-slate-300 text-xs rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all hover:border-slate-500"
+                                                            >
+                                                                <option value="en">EN</option>
+                                                                <option value="fr">FR</option>
+                                                            </select>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })
@@ -397,7 +487,22 @@ export default function PreviewView({ onBack }: PreviewViewProps) {
                                                 (key, idx) => (
                                                     <span
                                                         key={idx}
-                                                        className="px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-indigo-400 text-xs font-mono"
+                                                        className={`px-3 py-1.5 border rounded-lg text-xs font-mono cursor-pointer transition-all duration-200 ${
+                                                            hoveredTranslationKey ===
+                                                            key
+                                                                ? "bg-purple-900/30 border-purple-500 text-purple-300 ring-2 ring-purple-500/50 shadow-lg shadow-purple-500/20"
+                                                                : "bg-slate-800/50 border-slate-700 text-indigo-400 hover:border-purple-400"
+                                                        }`}
+                                                        onMouseEnter={() =>
+                                                            setHoveredTranslationKey(
+                                                                key,
+                                                            )
+                                                        }
+                                                        onMouseLeave={() =>
+                                                            setHoveredTranslationKey(
+                                                                null,
+                                                            )
+                                                        }
                                                     >
                                                         {key}
                                                     </span>
@@ -505,21 +610,23 @@ export default function PreviewView({ onBack }: PreviewViewProps) {
                                 ) : (
                                     /* Key prop resets the error boundary when component changes */
                                     <ErrorBoundary key={selectedComponentId}>
-                                        <IntlProvider
-                                            messages={mockTranslations}
-                                            locale="en"
+                                        <TranslationHighlighter
+                                            messages={translations[locale]}
+                                            locale={locale}
                                             defaultLocale="en"
+                                            hoveredTranslationKey={
+                                                hoveredTranslationKey
+                                            }
                                         >
                                             <QueryClientProvider
                                                 client={previewQueryClient}
                                             >
-                                                {/* Isolated preview container with all:revert to reset global styles */}
-                                                <div
-                                                    style={{
-                                                        all: "revert",
-                                                        display: "block",
-                                                    }}
-                                                >
+                                                <DesignSystemWrapper>
+                                                    {/* Isolated preview container with CSS layer isolation */}
+                                                    <div
+                                                        className="component-preview-container"
+                                                        data-component-id={selectedComponentId}
+                                                    >
                                                     {(() => {
                                                         const registryEntry =
                                                             componentRegistry.getComponent(
@@ -553,9 +660,10 @@ export default function PreviewView({ onBack }: PreviewViewProps) {
                                                             />
                                                         );
                                                     })()}
-                                                </div>
+                                                    </div>
+                                                </DesignSystemWrapper>
                                             </QueryClientProvider>
-                                        </IntlProvider>
+                                        </TranslationHighlighter>
                                     </ErrorBoundary>
                                 )}
                             </div>

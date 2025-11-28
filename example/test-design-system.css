@@ -1,0 +1,64 @@
+/* Test Design System CSS
+ * This should only affect components in the preview, NOT the engine shell
+ */
+
+/* CSS Variables for the design system */
+:root {
+  --test-primary: #10b981;
+  --test-secondary: #3b82f6;
+  --test-bg: #f3f4f6;
+  --test-text: #1f2937;
+  --test-border: #d1d5db;
+}
+
+/* Global styles scoped to preview */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--test-bg);
+  color: var(--test-text);
+  margin: 0;
+  padding: 0;
+}
+
+h1, h2, h3 {
+  color: var(--test-primary);
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+p {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--test-text);
+}
+
+button {
+  background-color: var(--test-secondary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+button:hover {
+  background-color: #2563eb;
+}
+
+.test-card {
+  background: white;
+  border: 2px solid var(--test-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}

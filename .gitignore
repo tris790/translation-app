@@ -34,3 +34,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .DS_Store
 
 context.json
+engine/ComponentBundle.ts
+engine/ComponentStyleBundle.ts
+engine/styles/
+engine/design-system.css
+engine/DesignSystemBundle.tsx
+engine/DesignSystemInit.ts

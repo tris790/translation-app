@@ -1,0 +1,27 @@
+{
+  "name": "Example App",
+  "sourceDir": "./example",
+  "rootDir": ".",
+  "ignore": [
+    "**/node_modules/**",
+    "**/*.test.tsx",
+    "**/*.test.ts"
+  ],
+  "excludeComponents": [
+    "App"
+  ],
+  "preview": {
+    "designSystem": {
+      "css": ["./example/test-design-system.css"],
+      "wrapper": {
+        "import": "./example/TestThemeProvider",
+        "exportType": "default",
+        "props": {
+          "theme": "light",
+          "primaryColor": "#10b981"
+        }
+      },
+      "init": null
+    }
+  }
+}

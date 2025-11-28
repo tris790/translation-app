@@ -17,6 +17,7 @@ interface ComponentMetadata {
   sourceFile: ts.SourceFile;
   node: ts.FunctionDeclaration | ts.VariableDeclaration;
   imports: Map<string, string>; // component name -> import source
+  cssImports: string[]; // CSS files imported by this component
   jsxElements: Array<{
     tagName: string;
     isConditional: boolean;
@@ -84,6 +85,7 @@ export class Analyzer {
         translations: component.translations,
         childrenIds: component.childrenIds,
         parentIds: component.parentIds,
+        cssImports: component.cssImports,
       };
 
       // Build translation reverse index
@@ -172,13 +174,14 @@ export class Analyzer {
   private extractComponents(sourceFile: ts.SourceFile): void {
     // First, extract imports
     const imports = this.extractImports(sourceFile);
+    const cssImports = this.extractCSSImports(sourceFile);
 
     const visit = (node: ts.Node) => {
       // Function declarations: function MyComponent() {}
       if (ts.isFunctionDeclaration(node) && node.name) {
         const name = node.name.text;
         if (this.isComponentName(name)) {
-          this.createComponent(sourceFile, node, name, imports);
+          this.createComponent(sourceFile, node, name, imports, cssImports);
         }
       }
 
@@ -192,13 +195,13 @@ export class Analyzer {
                 ts.isArrowFunction(declaration.initializer) ||
                 ts.isFunctionExpression(declaration.initializer)
               ) {
-                this.createComponent(sourceFile, declaration, name, imports);
+                this.createComponent(sourceFile, declaration, name, imports, cssImports);
               }
               // Handle HOCs: const MyComponent = memo(() => {})
               if (ts.isCallExpression(declaration.initializer)) {
                 const unwrapped = this.unwrapHOC(declaration.initializer);
                 if (unwrapped) {
-                  this.createComponent(sourceFile, declaration, name, imports);
+                  this.createComponent(sourceFile, declaration, name, imports, cssImports);
                 }
               }
             }
@@ -253,11 +256,42 @@ export class Analyzer {
   }
 
   /**
+   * Extract CSS imports from a source file
+   * Detects: import './styles.css', import "./component.css"
+   */
+  private extractCSSImports(sourceFile: ts.SourceFile): string[] {
+    const cssImports: string[] = [];
+
+    const visit = (node: ts.Node) => {
+      if (ts.isImportDeclaration(node) && node.moduleSpecifier) {
+        const moduleSpecifier = (node.moduleSpecifier as ts.StringLiteral).text;
+
+        // Check if it's a CSS file import (side-effect import)
+        if (moduleSpecifier.endsWith('.css')) {
+          // Resolve relative to source file
+          const sourceDir = path.dirname(sourceFile.fileName);
+          const resolvedPath = path.resolve(sourceDir, moduleSpecifier);
+          cssImports.push(resolvedPath);
+        }
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    visit(sourceFile);
+    return cssImports;
+  }
+
+  /**
    * Generate a unique ID for a component
+   * Uses relative path from rootPath for portability across different machines
    */
   private generateComponentId(name: string, filePath: string): string {
-    // Use name + path hash for uniqueness
-    const hash = createHash('md5').update(filePath).digest('hex').substring(0, 8);
+    // Use relative path from rootPath for portable hashes
+    const relativePath = path.relative(this.config.rootPath, filePath);
+    // Normalize to use forward slashes for cross-platform consistency
+    const normalizedPath = relativePath.split(path.sep).join('/');
+    const hash = createHash('md5').update(normalizedPath).digest('hex').substring(0, 8);
     return `${name}_${hash}`;
   }
 
@@ -268,7 +302,8 @@ export class Analyzer {
     sourceFile: ts.SourceFile,
     node: ts.FunctionDeclaration | ts.VariableDeclaration,
     name: string,
-    imports: Map<string, string>
+    imports: Map<string, string>,
+    cssImports: string[]
   ): void {
     const id = this.generateComponentId(name, sourceFile.fileName);
 
@@ -284,6 +319,7 @@ export class Analyzer {
       sourceFile,
       node,
       imports,
+      cssImports,
       jsxElements: this.extractJSXElements(node),
     };
 

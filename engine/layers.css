@@ -1,0 +1,117 @@
+/**
+ * CSS Layers Architecture for Style Isolation
+ *
+ * This file defines the CSS layer structure for the translation engine.
+ * Layers allow us to control the cascade and isolate preview component styles
+ * from the engine UI styles.
+ *
+ * Layer Priority (lowest to highest):
+ * 1. reset - Browser resets and base styles
+ * 2. engine - Engine UI styles (Tailwind and custom)
+ * 3. preview - Preview container isolation styles
+ * 4. preview-global - Design system global styles
+ * 5. components - Component-specific CSS (highest priority)
+ */
+
+@layer reset, engine, preview, preview-global, components;
+
+/**
+ * Preview Container Isolation
+ *
+ * These styles create an isolated environment for component previews
+ * while maintaining TranslationHighlighter functionality
+ */
+@layer preview {
+  .component-preview-container {
+    /* Isolation boundary - prevents engine styles from cascading in */
+    all: revert-layer;
+
+    /* Reset to browser defaults */
+    box-sizing: border-box;
+    display: block;
+
+    /* Create a new stacking context */
+    position: relative;
+    z-index: 0;
+    isolation: isolate;
+
+    /* Block CSS variable inheritance from engine */
+    --tw-border-spacing-x: initial;
+    --tw-border-spacing-y: initial;
+    --tw-translate-x: initial;
+    --tw-translate-y: initial;
+    --tw-rotate: initial;
+    --tw-skew-x: initial;
+    --tw-skew-y: initial;
+    --tw-scale-x: initial;
+    --tw-scale-y: initial;
+
+    /* Reset typography to browser defaults */
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #000;
+    background: #fff;
+
+    /* Reset spacing */
+    padding: 0;
+    margin: 0;
+  }
+
+  /* Reset common elements inside preview to browser defaults */
+  .component-preview-container h1,
+  .component-preview-container h2,
+  .component-preview-container h3,
+  .component-preview-container h4,
+  .component-preview-container h5,
+  .component-preview-container h6 {
+    font-size: revert;
+    font-weight: revert;
+    margin: revert;
+  }
+
+  .component-preview-container p {
+    margin: revert;
+  }
+
+  .component-preview-container ul,
+  .component-preview-container ol {
+    list-style: revert;
+    margin: revert;
+    padding: revert;
+  }
+
+  .component-preview-container a {
+    color: revert;
+    text-decoration: revert;
+  }
+
+  .component-preview-container button {
+    all: revert;
+  }
+
+  .component-preview-container input,
+  .component-preview-container textarea,
+  .component-preview-container select {
+    all: revert;
+  }
+
+  /* Ensure TranslationHighlighter styles still work */
+  .component-preview-container .translation-highlight {
+    outline: 2px solid rgb(168, 85, 247) !important;
+    outline-offset: 2px !important;
+    border-radius: 0.375rem !important;
+    background-color: rgba(168, 85, 247, 0.1) !important;
+    transition: all 200ms ease !important;
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.5) !important;
+    display: inline !important;
+  }
+}
+
+/**
+ * Component-specific CSS will be injected here dynamically
+ * This layer has the highest priority
+ */
+@layer components {
+  /* Dynamic component styles will be injected here via JavaScript */
+}

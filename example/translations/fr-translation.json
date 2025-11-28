@@ -3,5 +3,8 @@
     "description": "Ceci est une application React simple.",
     "home": "Accueil",
     "about": "À propos",
-    "contact": "Contacter"
+    "contact": "Contacter",
+    "product": "Produit",
+    "form": "Formulaire",
+    "test.button": "Cliquez-moi!"
 }

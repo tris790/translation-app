@@ -111,7 +111,7 @@ export default function Shell() {
           {!loading && !error && (
             <>
               {view === 'translations' && (
-                <div className="p-8 max-w-6xl mx-auto">
+                <div className="p-8 max-w-[1600px] mx-auto">
                   <TranslationView onSelectTranslation={() => setView('components')} />
                 </div>
               )}

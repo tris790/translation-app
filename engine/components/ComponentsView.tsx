@@ -22,7 +22,7 @@ interface ComponentsViewProps {
 }
 
 export default function ComponentsView({ onSelectComponent }: ComponentsViewProps) {
-  const { contextApp, selectedTranslation, setSelectedTranslation, setSelectedComponentId, getFilteredComponents } = useAppContext();
+  const { contextApp, selectedTranslation, setSelectedTranslation, setSelectedComponentId, searchTerm, setSearchTerm, getFilteredComponents } = useAppContext();
 
   if (!contextApp) return null;
 
@@ -62,6 +62,8 @@ export default function ComponentsView({ onSelectComponent }: ComponentsViewProp
           <input
             type="text"
             placeholder="Search components..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-slate-800 border border-slate-700 rounded-full py-2 pl-10 pr-4 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 w-64 transition-colors"
           />
         </div>
@@ -118,7 +120,9 @@ export default function ComponentsView({ onSelectComponent }: ComponentsViewProp
           <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-700 rounded-xl">
             <Box className="mx-auto h-12 w-12 text-slate-600 mb-4" />
             <p className="text-slate-400">
-              {selectedTranslation
+              {searchTerm
+                ? `No components found matching "${searchTerm}".`
+                : selectedTranslation
                 ? 'No components found matching this translation key.'
                 : 'No components found.'}
             </p>
