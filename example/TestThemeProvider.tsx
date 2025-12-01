@@ -25,7 +25,6 @@ export default function TestThemeProvider({
   primaryColor = '#10b981',
   children
 }: TestThemeProviderProps) {
-  console.log('TestThemeProvider initialized with:', { theme, primaryColor });
 
   return (
     <ThemeContext.Provider value={{ theme, primaryColor }}>

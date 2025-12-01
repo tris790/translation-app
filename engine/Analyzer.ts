@@ -327,6 +327,164 @@ export class Analyzer {
   }
 
   /**
+   * Extract enum values from a TypeScript type if it's an enum
+   */
+  private extractEnumValues(type: ts.Type): Record<string, string | number> | undefined {
+    // Check if this is a union type (enums are represented as unions of literal types)
+    if (!type.isUnion()) {
+      return undefined;
+    }
+
+    // Check if the type has a symbol with an enum declaration
+    if (type.symbol?.declarations) {
+      for (const decl of type.symbol.declarations) {
+        if (ts.isEnumDeclaration(decl)) {
+          const enumValues: Record<string, string | number> = {};
+
+          for (const member of decl.members) {
+            const name = member.name.getText();
+
+            // Get the computed value of the enum member
+            if (member.initializer) {
+              const initializerText = member.initializer.getText();
+
+              // String literal
+              if (ts.isStringLiteral(member.initializer)) {
+                enumValues[name] = member.initializer.text;
+              }
+              // Numeric literal
+              else if (ts.isNumericLiteral(member.initializer)) {
+                enumValues[name] = Number(member.initializer.text);
+              }
+              // Try to parse as number or string
+              else {
+                const parsed = Number(initializerText);
+                enumValues[name] = isNaN(parsed) ? initializerText : parsed;
+              }
+            } else {
+              // Auto-incremented number enum (default behavior)
+              // Find the previous member's value and increment
+              const members = Array.from(decl.members);
+              const index = members.indexOf(member);
+              if (index === 0) {
+                enumValues[name] = 0;
+              } else {
+                const prevValue = enumValues[members[index - 1].name.getText()];
+                enumValues[name] = typeof prevValue === 'number' ? prevValue + 1 : index;
+              }
+            }
+          }
+
+          return Object.keys(enumValues).length > 0 ? enumValues : undefined;
+        }
+      }
+    }
+
+    // Fallback: Check if this is a union of string or number literals
+    const types = type.types;
+    if (types.length === 0) return undefined;
+
+    const allStringLiterals = types.every(t => t.isStringLiteral());
+    const allNumberLiterals = types.every(t => t.isNumberLiteral());
+
+    if (allStringLiterals || allNumberLiterals) {
+      const enumValues: Record<string, string | number> = {};
+
+      types.forEach((t, index) => {
+        if (t.isStringLiteral()) {
+          const value = (t as ts.StringLiteralType).value;
+          enumValues[`Value${index}`] = value;
+        } else if (t.isNumberLiteral()) {
+          const value = (t as ts.NumberLiteralType).value;
+          enumValues[`Value${index}`] = value;
+        }
+      });
+
+      return Object.keys(enumValues).length > 0 ? enumValues : undefined;
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Extract properties from an interface/object type recursively
+   */
+  private extractInterfaceProperties(
+    type: ts.Type,
+    visited: Set<string> = new Set(),
+    depth: number = 0
+  ): Prop[] | undefined {
+    // Prevent infinite recursion
+    const maxDepth = 5;
+    if (depth >= maxDepth) return undefined;
+
+    // Prevent circular references
+    const typeId = this.checker.typeToString(type);
+    if (visited.has(typeId)) return undefined;
+
+    // Skip primitive types (string, number, boolean, etc.)
+    const typeString = this.checker.typeToString(type);
+    const primitiveTypes = ['string', 'number', 'boolean', 'symbol', 'undefined', 'null', 'void', 'any', 'unknown', 'date'];
+    if (primitiveTypes.includes(typeString.toLowerCase())) {
+      return undefined;
+    }
+
+    // Skip function types
+    if (typeString.includes('=>') || typeString.includes('function')) {
+      return undefined;
+    }
+
+    // Skip array types (they'll be handled by the array generation logic)
+    if (typeString.endsWith('[]')) {
+      return undefined;
+    }
+
+    visited.add(typeId);
+
+    // Check if this is an object-like type that has properties
+    const properties = type.getProperties();
+    if (!properties || properties.length === 0) {
+      return undefined;
+    }
+
+    const result: Prop[] = [];
+
+    for (const prop of properties) {
+      try {
+        const propType = this.checker.getTypeOfSymbolAtLocation(
+          prop,
+          prop.valueDeclaration || prop.declarations?.[0] || this.program.getSourceFiles()[0]
+        );
+
+        const propName = prop.getName();
+        const typeString = this.checker.typeToString(propType);
+
+        // Extract enum values if applicable
+        const enumValues = this.extractEnumValues(propType);
+
+        // Recursively extract nested properties for object types
+        const nestedProperties = this.extractInterfaceProperties(
+          propType,
+          new Set(visited), // Pass copy to allow sibling recursion
+          depth + 1
+        );
+
+        result.push({
+          name: propName,
+          type: typeString,
+          enumValues,
+          properties: nestedProperties,
+        });
+      } catch (error) {
+        // Skip properties that can't be extracted
+        console.warn(`Could not extract property ${prop.getName()}:`, error);
+      }
+    }
+
+    return result.length > 0 ? result : undefined;
+  }
+
+  /**
    * Extract props from a component node
    */
   private extractProps(node: ts.FunctionDeclaration | ts.VariableDeclaration): Prop[] {
@@ -358,9 +516,23 @@ export class Analyzer {
     if (ts.isObjectBindingPattern(propsParam.name)) {
       for (const element of propsParam.name.elements) {
         if (ts.isBindingElement(element) && ts.isIdentifier(element.name)) {
+          // Try to get the type from the element to extract enum values and nested properties
+          let enumValues: Record<string, string | number> | undefined = undefined;
+          let properties: Prop[] | undefined = undefined;
+          if (element.type) {
+            const elemType = this.checker.getTypeAtLocation(element.type);
+            enumValues = this.extractEnumValues(elemType);
+            // Only extract properties if it's not an enum
+            if (!enumValues) {
+              properties = this.extractInterfaceProperties(elemType);
+            }
+          }
+
           props.push({
             name: element.name.text,
             type: element.type ? element.type.getText() : 'any',
+            enumValues,
+            properties,
           });
         }
       }
@@ -369,9 +541,15 @@ export class Analyzer {
       const type = this.checker.getTypeAtLocation(propsParam);
       for (const prop of type.getProperties()) {
         const propType = this.checker.getTypeOfSymbolAtLocation(prop, propsParam);
+        const enumValues = this.extractEnumValues(propType);
+        // Only extract properties if it's not an enum
+        const properties = enumValues ? undefined : this.extractInterfaceProperties(propType);
+
         props.push({
           name: prop.getName(),
           type: this.checker.typeToString(propType),
+          enumValues,
+          properties,
         });
       }
     }

@@ -15,9 +15,10 @@ interface PropInputProps {
   onChange: (newValue: any) => void;
   label: string;
   options?: string[];
+  enumValues?: Record<string, string | number>;
 }
 
-export default function PropInput({ type, value, onChange, label, options }: PropInputProps) {
+export default function PropInput({ type, value, onChange, label, options, enumValues }: PropInputProps) {
   const baseLabel = (
     <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
       {label}
@@ -123,13 +124,24 @@ export default function PropInput({ type, value, onChange, label, options }: Pro
       );
     }
     case 'enum': {
+      // Convert the stored value (number/string) to the display key
+      let displayValue = '';
+      if (enumValues && value !== undefined && value !== null) {
+        // Find the key whose value matches the stored value
+        const key = Object.keys(enumValues).find(k => enumValues[k] === value);
+        displayValue = key || '';
+      } else if (typeof value === 'string') {
+        // Fallback for string enums without enumValues
+        displayValue = value;
+      }
+
       return (
         <div className="mb-5">
           {baseLabel}
           <div className="relative">
             <List size={14} className="absolute left-3 top-2.5 text-slate-600" />
             <select
-              value={typeof value === 'string' ? value : ''}
+              value={displayValue}
               onChange={(e) => onChange(e.target.value)}
               className={`${baseInputClass} pl-9 appearance-none`}
             >

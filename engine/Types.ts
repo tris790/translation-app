@@ -8,6 +8,8 @@ export interface Translation {
 export interface Prop {
   name: string;
   type: string;
+  enumValues?: Record<string, string | number>;
+  properties?: Prop[];  // For nested object/interface types
 }
 
 export interface Hook {

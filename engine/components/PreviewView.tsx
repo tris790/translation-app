@@ -271,10 +271,18 @@ export default function PreviewView({ onBack }: PreviewViewProps) {
         setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
     };
 
-    const handlePropChange = (propName: string, newValue: any) => {
-        setPropValues((prev) => ({ ...prev, [propName]: newValue }));
+    const handlePropChange = (propName: string, newValue: any, enumValues?: Record<string, string | number>) => {
+        // If this is an enum prop, convert the key name back to its value
+        let processedValue = newValue;
+        if (enumValues && typeof newValue === 'string' && newValue in enumValues) {
+            // newValue is the key name (e.g., "Low")
+            // Convert to the actual enum value (e.g., 0)
+            processedValue = enumValues[newValue];
+        }
+
+        setPropValues((prev) => ({ ...prev, [propName]: processedValue }));
         // In a real app, you would send this to a backend or update the component
-        console.log(`Prop "${propName}" changed to:`, newValue);
+        console.log(`Prop "${propName}" changed to:`, processedValue);
     };
 
     return (
@@ -359,15 +367,18 @@ export default function PreviewView({ onBack }: PreviewViewProps) {
                                         component.props.map((prop, idx) => (
                                             <PropInput
                                                 key={idx}
-                                                type={prop.type}
+                                                type={prop.enumValues ? 'enum' : prop.type}
                                                 label={prop.name}
                                                 value={propValues?.[prop.name]}
                                                 onChange={(newValue) =>
                                                     handlePropChange(
                                                         prop.name,
                                                         newValue,
+                                                        prop.enumValues
                                                     )
                                                 }
+                                                options={prop.enumValues ? Object.keys(prop.enumValues) : undefined}
+                                                enumValues={prop.enumValues}
                                             />
                                         ))
                                     )}
